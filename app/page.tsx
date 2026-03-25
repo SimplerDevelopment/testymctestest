@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { getPosts } from '@/lib/cms';
 
+export const revalidate = 60;
+
 export default async function Home() {
   const { data: recentPosts } = await getPosts({ postType: 'blog', limit: 3 });
 

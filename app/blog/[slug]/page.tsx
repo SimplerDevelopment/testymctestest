@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { getPost, getPosts } from '@/lib/cms';
 import type { Metadata } from 'next';
 
+export const revalidate = 60;
+
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

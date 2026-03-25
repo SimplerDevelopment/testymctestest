@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getPosts } from '@/lib/cms';
 import type { Metadata } from 'next';
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: 'Blog',
   description: 'Latest articles and updates',
