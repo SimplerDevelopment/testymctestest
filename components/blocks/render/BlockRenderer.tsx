@@ -1,49 +1,35 @@
 'use client';
 
 import { Block, BlockEditorData } from '@/types/blocks';
-import { TextBlockRender } from './TextBlockRender';
-import { HeadingBlockRender } from './HeadingBlockRender';
-import { ImageBlockRender } from './ImageBlockRender';
-import { ButtonBlockRender } from './ButtonBlockRender';
-import { SpacerBlockRender } from './SpacerBlockRender';
-import { DividerBlockRender } from './DividerBlockRender';
-import { QuoteBlockRender } from './QuoteBlockRender';
-import { CodeBlockRender } from './CodeBlockRender';
-import { VideoBlockRender } from './VideoBlockRender';
-import { YoutubeBlockRender } from './YoutubeBlockRender';
-import { ColumnsBlockRender } from './ColumnsBlockRender';
-import { TabsBlockRender } from './TabsBlockRender';
-import { AccordionBlockRender } from './AccordionBlockRender';
-import { HeroBlockRender } from './HeroBlockRender';
-import { ServicesGridBlockRender } from './ServicesGridBlockRender';
-import { CtaBlockRender } from './CtaBlockRender';
-import { TestimonialBlockRender } from './TestimonialBlockRender';
-import { StatsBlockRender } from './StatsBlockRender';
-import { BlogPostsBlockRender } from './BlogPostsBlockRender';
-import { FeaturedContentBlockRender } from './FeaturedContentBlockRender';
-import { CardGridBlockRender } from './CardGridBlockRender';
-import { SectionBlockRender } from './SectionBlockRender';
-import { GalleryBlockRender } from './GalleryBlockRender';
 import { BlockStyleWrapper } from './BlockStyleWrapper';
+import { SelectableBlock } from '@/components/visual-editor/SelectableBlock';
+import { useEditorModeContext } from '@/components/visual-editor/EditorModeProvider';
+import { getBlockRegistry } from '@/lib/visual-editor/registry';
 
 interface BlockRendererProps {
   content: string;
 }
 
 export function BlockRenderer({ content }: BlockRendererProps) {
-  // Parse content as BlockEditorData
+  const editor = useEditorModeContext();
+  const registry = getBlockRegistry();
+
+  // In editor mode, use blocks from the parent editor instead of parsed content
   let blocks: Block[] = [];
 
-  try {
-    const data = JSON.parse(content) as BlockEditorData;
-    blocks = data.blocks || [];
-  } catch {
-    // If not valid JSON, display as raw HTML
-    return (
-      <div className="prose prose-lg dark:prose-invert max-w-none">
-        <div dangerouslySetInnerHTML={{ __html: content }} />
-      </div>
-    );
+  if (editor.active && editor.blocks.length > 0) {
+    blocks = editor.blocks;
+  } else {
+    try {
+      const data = JSON.parse(content) as BlockEditorData;
+      blocks = data.blocks || [];
+    } catch {
+      return (
+        <div className="prose prose-lg dark:prose-invert max-w-none">
+          <div dangerouslySetInnerHTML={{ __html: content }} />
+        </div>
+      );
+    }
   }
 
   if (blocks.length === 0) {
@@ -52,66 +38,37 @@ export function BlockRenderer({ content }: BlockRendererProps) {
 
   return (
     <div className="block-content space-y-6">
-      {blocks.map((block) => (
-        <div key={block.id} className="block-wrapper">
+      {blocks.map((block) => {
+        const Component = registry.get(block.type);
+        if (!Component) return null;
+
+        const rendered = (
           <BlockStyleWrapper block={block}>
-            {renderBlock(block)}
+            <Component block={block} />
           </BlockStyleWrapper>
-        </div>
-      ))}
+        );
+
+        if (editor.active) {
+          return (
+            <SelectableBlock
+              key={block.id}
+              blockId={block.id}
+              isSelected={editor.selectedBlockId === block.id}
+              isHovered={editor.hoveredBlockId === block.id}
+              onClicked={editor.onBlockClicked}
+              onHovered={editor.onBlockHovered}
+            >
+              {rendered}
+            </SelectableBlock>
+          );
+        }
+
+        return (
+          <div key={block.id} className="block-wrapper">
+            {rendered}
+          </div>
+        );
+      })}
     </div>
   );
-}
-
-function renderBlock(block: Block) {
-  switch (block.type) {
-    case 'text':
-      return <TextBlockRender block={block} />;
-    case 'heading':
-      return <HeadingBlockRender block={block} />;
-    case 'image':
-      return <ImageBlockRender block={block} />;
-    case 'button':
-      return <ButtonBlockRender block={block} />;
-    case 'spacer':
-      return <SpacerBlockRender block={block} />;
-    case 'divider':
-      return <DividerBlockRender block={block} />;
-    case 'quote':
-      return <QuoteBlockRender block={block} />;
-    case 'code':
-      return <CodeBlockRender block={block} />;
-    case 'video':
-      return <VideoBlockRender block={block} />;
-    case 'youtube':
-      return <YoutubeBlockRender block={block} />;
-    case 'columns':
-      return <ColumnsBlockRender block={block} />;
-    case 'tabs':
-      return <TabsBlockRender block={block} />;
-    case 'accordion':
-      return <AccordionBlockRender block={block} />;
-    case 'hero':
-      return <HeroBlockRender block={block} />;
-    case 'services-grid':
-      return <ServicesGridBlockRender block={block} />;
-    case 'cta':
-      return <CtaBlockRender block={block} />;
-    case 'testimonial':
-      return <TestimonialBlockRender block={block} />;
-    case 'stats':
-      return <StatsBlockRender block={block} />;
-    case 'blog-posts':
-      return <BlogPostsBlockRender block={block} />;
-    case 'featured-content':
-      return <FeaturedContentBlockRender block={block} />;
-    case 'card-grid':
-      return <CardGridBlockRender block={block} />;
-    case 'section':
-      return <SectionBlockRender block={block} />;
-    case 'gallery':
-      return <GalleryBlockRender block={block} />;
-    default:
-      return null;
-  }
 }
