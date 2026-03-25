@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getPost, getPosts } from '@/lib/cms';
+import { BlockRenderer } from '@/components/blocks/render/BlockRenderer';
 import type { Metadata } from 'next';
 
 export const revalidate = 60;
@@ -82,10 +83,9 @@ export default async function BlogPost({ params }: Props) {
           </div>
         )}
 
-        <div
-          className="prose prose-gray mt-8 max-w-none"
-          dangerouslySetInnerHTML={{ __html: post.content }}
-        />
+        <div className="prose prose-gray mt-8 max-w-none">
+          <BlockRenderer content={post.content} />
+        </div>
       </article>
     </main>
   );
