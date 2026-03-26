@@ -397,6 +397,7 @@ function SortableBlock({
         onStyleUpdate={editor.onBlockStyleUpdated}
         currentStyle={liveBlock.style ? { padding: liveBlock.style.padding, margin: liveBlock.style.margin } : undefined}
         dragListeners={listeners}
+        columnsData={liveBlock.type === 'columns' && 'columns' in liveBlock ? { columns: (liveBlock as { columns: { id: string; width: number }[] }).columns, gap: (liveBlock as { gap?: 'sm' | 'md' | 'lg' }).gap } : undefined}
       >
         {isContainer ? (
           <ContainerBlockRenderer block={liveBlock} registry={registry} draggingId={draggingId} editor={editor} />

@@ -2,6 +2,12 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
+import { ColumnsEditorOverlay } from './ColumnsEditorOverlay';
+
+interface ColumnData {
+  id: string;
+  width: number;
+}
 
 interface SelectableBlockProps {
   blockId: string;
@@ -15,6 +21,8 @@ interface SelectableBlockProps {
   onStyleUpdate?: (blockId: string, style: Record<string, string>) => void;
   currentStyle?: { padding?: string; margin?: string };
   dragListeners?: SyntheticListenerMap;
+  /** For columns blocks: pass column data to render resize/gap controls */
+  columnsData?: { columns: ColumnData[]; gap?: 'sm' | 'md' | 'lg' };
   children: React.ReactNode;
 }
 
@@ -30,6 +38,7 @@ export function SelectableBlock({
   onStyleUpdate,
   currentStyle,
   dragListeners,
+  columnsData,
   children,
 }: SelectableBlockProps) {
   const showControls = isSelected || isHovered;
@@ -115,6 +124,16 @@ export function SelectableBlock({
           blockId={blockId}
           currentStyle={currentStyle}
           onStyleUpdate={onStyleUpdate}
+        />
+      )}
+
+      {/* Column resize + gap drag controls */}
+      {isSelected && columnsData && columnsData.columns.length > 1 && (
+        <ColumnsEditorOverlay
+          blockId={blockId}
+          columns={columnsData.columns}
+          gap={columnsData.gap}
+          containerRef={containerRef}
         />
       )}
 

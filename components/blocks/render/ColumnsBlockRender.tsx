@@ -1,10 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
 import { ColumnsBlock, Block } from '@/types/blocks';
 import { combineResponsiveClasses } from '@/lib/utils/responsive';
-import { useEditorModeContext } from '@/components/visual-editor/EditorModeProvider';
-import { ColumnsEditorOverlay } from '@/components/visual-editor/ColumnsEditorOverlay';
 import { TextBlockRender } from './TextBlockRender';
 import { HeadingBlockRender } from './HeadingBlockRender';
 import { ImageBlockRender } from './ImageBlockRender';
@@ -34,9 +31,6 @@ interface ColumnsBlockRenderProps {
 }
 
 export function ColumnsBlockRender({ block }: ColumnsBlockRenderProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { active: isEditMode, selectedBlockId } = useEditorModeContext();
-  const isSelected = isEditMode && selectedBlockId === block.id;
   // No editor context in client sites — always use CSS-based responsive approach
   const editorViewport: string | null = null;
 
@@ -91,16 +85,7 @@ export function ColumnsBlockRender({ block }: ColumnsBlockRenderProps) {
 
   return (
     <div className={`py-8 my-8 ${responsiveClasses}`}>
-      <div ref={containerRef} className={`relative flex ${stackingClasses} ${gapClasses[block.gap || 'md']}`}>
-        {/* Column resize + gap drag controls (edit mode only) */}
-        {isSelected && (
-          <ColumnsEditorOverlay
-            blockId={block.id}
-            columns={block.columns}
-            gap={block.gap}
-            containerRef={containerRef}
-          />
-        )}
+      <div className={`flex ${stackingClasses} ${gapClasses[block.gap || 'md']}`}>
         {block.columns.map((column) => {
           const paddingClass = column.padding === 'sm' ? 'p-2' : column.padding === 'md' ? 'p-4' : column.padding === 'lg' ? 'p-6' : '';
           const verticalAlignClass = column.verticalAlign === 'center' ? 'flex flex-col justify-center' : column.verticalAlign === 'bottom' ? 'flex flex-col justify-end' : '';
