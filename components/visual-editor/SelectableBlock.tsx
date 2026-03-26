@@ -323,8 +323,8 @@ function SpacingHandles({
       const handleMove = (me: MouseEvent) => {
         const isVertical = side === 'top' || side === 'bottom';
         const delta = isVertical
-          ? (side === 'top' ? startY - me.clientY : me.clientY - startY)
-          : (side === 'left' ? startX - me.clientX : me.clientX - startX);
+          ? me.clientY - startY
+          : startX - me.clientX;
         const newVal = Math.max(0, Math.round(startVal + delta));
         const updated = { ...current, [side]: newVal };
         setLiveLabel(`${type} ${side}: ${newVal}px`);
