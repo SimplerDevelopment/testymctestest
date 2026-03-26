@@ -40,6 +40,11 @@ export function ColumnsBlockRender({ block }: ColumnsBlockRenderProps) {
     lg: 'gap-8',
   };
 
+  const gapPx = block.gap === 'sm' ? 16 : block.gap === 'lg' ? 32 : 24;
+  const colCount = block.columns.length;
+  // Total gap space shared across all columns for flex-basis calc
+  const gapPerColumn = colCount > 1 ? ((colCount - 1) * gapPx) / colCount : 0;
+
   const stackOnMobile = block.stackOnMobile !== false;
   const stackOnTablet = block.stackOnTablet === true;
 
@@ -93,16 +98,10 @@ export function ColumnsBlockRender({ block }: ColumnsBlockRenderProps) {
           return (
             <div
               key={column.id}
-              className={`${paddingClass} ${verticalAlignClass} ${column.cssClass || ''}`}
+              className={`min-w-0 ${paddingClass} ${verticalAlignClass} ${column.cssClass || ''}`}
               {...(colStackAttr ? { [colStackAttr]: '' } : {})}
               style={{
-                ...(shouldStackFromEditor !== null
-                  ? {
-                      width: shouldStackFromEditor ? '100%' : `${column.width}%`,
-                      flex: shouldStackFromEditor ? '0 0 100%' : `0 0 ${column.width}%`,
-                    }
-                  : { '--col-width': `${column.width}%` } as React.CSSProperties
-                ),
+                flex: `0 0 calc(${column.width}% - ${gapPerColumn}px)`,
                 ...(column.backgroundColor ? { backgroundColor: column.backgroundColor } : {}),
               }}
             >
