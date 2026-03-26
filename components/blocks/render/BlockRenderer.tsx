@@ -375,9 +375,6 @@ function SortableBlock({
     transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
-    // Apply padding/margin directly so drag-to-adjust is instant
-    padding: liveBlock.style?.padding || undefined,
-    margin: liveBlock.style?.margin || undefined,
   };
 
   const Component = registry.get(block.type);
@@ -445,8 +442,6 @@ function NestedSortableBlock({
     transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
-    padding: liveBlock.style?.padding || undefined,
-    margin: liveBlock.style?.margin || undefined,
   };
 
   const Component = registry.get(block.type);
