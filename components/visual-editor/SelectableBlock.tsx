@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
 interface SelectableBlockProps {
   blockId: string;
@@ -8,6 +9,7 @@ interface SelectableBlockProps {
   isHovered: boolean;
   onClicked: (blockId: string) => void;
   onHovered: (blockId: string | null) => void;
+  dragListeners?: SyntheticListenerMap;
   children: React.ReactNode;
 }
 
@@ -17,6 +19,7 @@ export function SelectableBlock({
   isHovered,
   onClicked,
   onHovered,
+  dragListeners,
   children,
 }: SelectableBlockProps) {
   return (
@@ -40,23 +43,27 @@ export function SelectableBlock({
         borderRadius: '4px',
       }}
     >
-      {/* Block type label on hover/select */}
+      {/* Toolbar on hover/select */}
       {(isSelected || isHovered) && (
         <div
-          className="absolute -top-6 left-0 text-xs font-medium px-1.5 py-0.5 rounded z-50"
-          style={{
-            backgroundColor: isSelected ? '#3b82f6' : '#94a3b8',
-            color: 'white',
-          }}
+          className="absolute -top-7 left-0 flex items-center gap-1 text-xs font-medium px-1 py-0.5 rounded z-50"
+          style={{ backgroundColor: isSelected ? '#3b82f6' : '#94a3b8', color: 'white' }}
         >
-          Block
+          {dragListeners && (
+            <span
+              {...dragListeners}
+              className="cursor-grab active:cursor-grabbing"
+              style={{ lineHeight: 1 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              ⠿
+            </span>
+          )}
+          <span>Block</span>
         </div>
       )}
       {/* Prevent link clicks in edit mode */}
-      <div
-        style={{ pointerEvents: 'none' }}
-        onClick={(e) => e.preventDefault()}
-      >
+      <div style={{ pointerEvents: 'none' }} onClick={(e) => e.preventDefault()}>
         <div style={{ pointerEvents: 'auto' }}>
           {children}
         </div>

@@ -12,6 +12,7 @@ interface EditorModeContextValue {
   pageSettings?: PageSettings;
   onBlockClicked: (blockId: string) => void;
   onBlockHovered: (blockId: string | null) => void;
+  onBlocksReordered: (blocks: Block[]) => void;
 }
 
 const EditorModeContext = createContext<EditorModeContextValue>({
@@ -21,6 +22,7 @@ const EditorModeContext = createContext<EditorModeContextValue>({
   hoveredBlockId: null,
   onBlockClicked: () => {},
   onBlockHovered: () => {},
+  onBlocksReordered: () => {},
 });
 
 export function useEditorModeContext() {

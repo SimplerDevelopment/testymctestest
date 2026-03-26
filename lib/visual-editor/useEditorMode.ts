@@ -101,5 +101,14 @@ export function useEditorMode() {
     [state.active],
   );
 
-  return { ...state, onBlockClicked, onBlockHovered };
+  const onBlocksReordered = useCallback(
+    (newBlocks: Block[]) => {
+      if (!state.active) return;
+      setState((s) => ({ ...s, blocks: newBlocks }));
+      sendToParent(IFRAME_MESSAGES.BLOCKS_REORDERED, { blocks: newBlocks });
+    },
+    [state.active],
+  );
+
+  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered };
 }
