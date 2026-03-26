@@ -16,6 +16,10 @@ interface EditorModeContextValue {
   onAddBlockAfter: (blockId: string) => void;
   onBlockResized: (blockId: string, width: string | undefined, height: string | undefined) => void;
   onBlockStyleUpdated: (blockId: string, style: Record<string, string>) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 const EditorModeContext = createContext<EditorModeContextValue>({
@@ -29,6 +33,10 @@ const EditorModeContext = createContext<EditorModeContextValue>({
   onAddBlockAfter: () => {},
   onBlockResized: () => {},
   onBlockStyleUpdated: () => {},
+  undo: () => {},
+  redo: () => {},
+  canUndo: false,
+  canRedo: false,
 });
 
 export function useEditorModeContext() {

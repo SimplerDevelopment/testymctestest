@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isValidOrigin, isVisualEditorMessage, sendToParent, PARENT_MESSAGES, IFRAME_MESSAGES } from './protocol';
 import type { Block, PageSettings } from '@/types/blocks';
 import { getBlockRegistry } from './registry';
@@ -13,6 +13,8 @@ interface EditorState {
   pageSettings?: PageSettings;
 }
 
+const MAX_HISTORY = 50;
+
 export function useEditorMode() {
   const [state, setState] = useState<EditorState>({
     active: false,
@@ -20,6 +22,39 @@ export function useEditorMode() {
     selectedBlockId: null,
     hoveredBlockId: null,
   });
+
+  // Undo/redo history
+  const historyRef = useRef<Block[][]>([]);
+  const futureRef = useRef<Block[][]>([]);
+  const skipHistoryRef = useRef(false);
+
+  const pushHistory = useCallback((blocks: Block[]) => {
+    historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), blocks];
+    futureRef.current = [];
+  }, []);
+
+  const canUndo = historyRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    const prev = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, state.blocks];
+    skipHistoryRef.current = true;
+    setState((s) => ({ ...s, blocks: prev }));
+    sendToParent(IFRAME_MESSAGES.BLOCKS_REORDERED, { blocks: prev });
+  }, [state.blocks]);
+
+  const redo = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    const next = futureRef.current[futureRef.current.length - 1];
+    futureRef.current = futureRef.current.slice(0, -1);
+    historyRef.current = [...historyRef.current, state.blocks];
+    skipHistoryRef.current = true;
+    setState((s) => ({ ...s, blocks: next }));
+    sendToParent(IFRAME_MESSAGES.BLOCKS_REORDERED, { blocks: next });
+  }, [state.blocks]);
 
   // Detect edit mode and set up listeners
   useEffect(() => {
@@ -48,6 +83,11 @@ export function useEditorMode() {
         }
         case PARENT_MESSAGES.BLOCKS_UPDATE: {
           const { blocks } = event.data.payload as { blocks: Block[] };
+          // Don't overwrite local state during undo/redo
+          if (skipHistoryRef.current) {
+            skipHistoryRef.current = false;
+            return;
+          }
           setState((s) => ({ ...s, blocks }));
           break;
         }
@@ -104,10 +144,11 @@ export function useEditorMode() {
   const onBlocksReordered = useCallback(
     (newBlocks: Block[]) => {
       if (!state.active) return;
+      pushHistory(state.blocks);
       setState((s) => ({ ...s, blocks: newBlocks }));
       sendToParent(IFRAME_MESSAGES.BLOCKS_REORDERED, { blocks: newBlocks });
     },
-    [state.active],
+    [state.active, state.blocks, pushHistory],
   );
 
   const onAddBlockAfter = useCallback(
@@ -138,11 +179,24 @@ export function useEditorMode() {
           if (b.type === 'section') return { ...b, blocks: updateStyle(b.blocks) };
           return b;
         });
+      pushHistory(state.blocks);
       setState((s) => ({ ...s, blocks: updateStyle(s.blocks) }));
       sendToParent(IFRAME_MESSAGES.BLOCK_STYLE_UPDATED, { blockId, style });
     },
-    [state.active],
+    [state.active, state.blocks, pushHistory],
   );
 
-  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter, onBlockResized, onBlockStyleUpdated };
+  return {
+    ...state,
+    onBlockClicked,
+    onBlockHovered,
+    onBlocksReordered,
+    onAddBlockAfter,
+    onBlockResized,
+    onBlockStyleUpdated,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  };
 }
