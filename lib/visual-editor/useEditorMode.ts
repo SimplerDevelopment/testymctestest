@@ -129,11 +129,16 @@ export function useEditorMode() {
   const onBlockStyleUpdated = useCallback(
     (blockId: string, style: Record<string, string>) => {
       if (!state.active) return;
-      // Update local blocks state with new style
-      setState((s) => ({
-        ...s,
-        blocks: s.blocks.map(b => b.id === blockId ? { ...b, style: { ...(b.style || {}), ...style } } : b),
-      }));
+      // Recursively update block style (works for nested blocks too)
+      const updateStyle = (blocks: Block[]): Block[] =>
+        blocks.map(b => {
+          if (b.id === blockId) return { ...b, style: { ...(b.style || {}), ...style } };
+          if (b.type === 'columns') return { ...b, columns: b.columns.map(c => ({ ...c, blocks: updateStyle(c.blocks) })) };
+          if (b.type === 'tabs') return { ...b, tabs: b.tabs.map(t => ({ ...t, blocks: updateStyle(t.blocks) })) };
+          if (b.type === 'section') return { ...b, blocks: updateStyle(b.blocks) };
+          return b;
+        });
+      setState((s) => ({ ...s, blocks: updateStyle(s.blocks) }));
       sendToParent(IFRAME_MESSAGES.BLOCK_STYLE_UPDATED, { blockId, style });
     },
     [state.active],

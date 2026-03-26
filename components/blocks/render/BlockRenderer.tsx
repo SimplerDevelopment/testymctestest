@@ -355,11 +355,17 @@ function SortableBlock({
   editor: ReturnType<typeof useEditorModeContext>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: block.id, transition: null });
-  const style = {
+  // Get live block data from editor state (includes real-time style updates)
+  const liveBlock = editor.blocks.find(b => b.id === block.id) || block;
+
+  const style: React.CSSProperties = {
     opacity: isDragging ? 0.3 : 1,
     transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
+    // Apply padding/margin directly so drag-to-adjust is instant
+    padding: liveBlock.style?.padding || undefined,
+    margin: liveBlock.style?.margin || undefined,
   };
 
   const Component = registry.get(block.type);
@@ -380,14 +386,14 @@ function SortableBlock({
         onAddAfter={onAddAfter}
         onResize={onResize}
         onStyleUpdate={editor.onBlockStyleUpdated}
-        currentStyle={block.style ? { padding: block.style.padding, margin: block.style.margin } : undefined}
+        currentStyle={liveBlock.style ? { padding: liveBlock.style.padding, margin: liveBlock.style.margin } : undefined}
         dragListeners={listeners}
       >
         {isContainer ? (
-          <ContainerBlockRenderer block={block} registry={registry} draggingId={draggingId} editor={editor} />
+          <ContainerBlockRenderer block={liveBlock} registry={registry} draggingId={draggingId} editor={editor} />
         ) : (
-          <BlockStyleWrapper block={block}>
-            <Component block={block} />
+          <BlockStyleWrapper block={liveBlock}>
+            <Component block={liveBlock} />
           </BlockStyleWrapper>
         )}
       </SelectableBlock>
@@ -409,11 +415,26 @@ function NestedSortableBlock({
   draggingId: string | null;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: block.id, transition: null });
-  const style = {
+
+  // Find live block from editor state for real-time style updates
+  const findLiveBlock = (blocks: Block[], id: string): Block | null => {
+    for (const b of blocks) {
+      if (b.id === id) return b;
+      if (b.type === 'columns') for (const c of b.columns) { const f = findLiveBlock(c.blocks, id); if (f) return f; }
+      if (b.type === 'tabs') for (const t of b.tabs) { const f = findLiveBlock(t.blocks, id); if (f) return f; }
+      if (b.type === 'section') { const f = findLiveBlock(b.blocks, id); if (f) return f; }
+    }
+    return null;
+  };
+  const liveBlock = findLiveBlock(editor.blocks, block.id) || block;
+
+  const style: React.CSSProperties = {
     opacity: isDragging ? 0.3 : 1,
     transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
+    padding: liveBlock.style?.padding || undefined,
+    margin: liveBlock.style?.margin || undefined,
   };
 
   const Component = registry.get(block.type);
@@ -431,10 +452,12 @@ function NestedSortableBlock({
         onHovered={editor.onBlockHovered}
         onAddAfter={editor.onAddBlockAfter}
         onResize={editor.onBlockResized}
+        onStyleUpdate={editor.onBlockStyleUpdated}
+        currentStyle={liveBlock.style ? { padding: liveBlock.style.padding, margin: liveBlock.style.margin } : undefined}
         dragListeners={listeners}
       >
-        <BlockStyleWrapper block={block}>
-          <Component block={block} />
+        <BlockStyleWrapper block={liveBlock}>
+          <Component block={liveBlock} />
         </BlockStyleWrapper>
       </SelectableBlock>
     </div>
