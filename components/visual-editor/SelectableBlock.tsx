@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
 interface SelectableBlockProps {
@@ -11,6 +11,7 @@ interface SelectableBlockProps {
   onClicked: (blockId: string) => void;
   onHovered: (blockId: string | null) => void;
   onAddAfter?: (blockId: string) => void;
+  onResize?: (blockId: string, width: string | undefined, height: string | undefined) => void;
   dragListeners?: SyntheticListenerMap;
   children: React.ReactNode;
 }
@@ -23,13 +24,16 @@ export function SelectableBlock({
   onClicked,
   onHovered,
   onAddAfter,
+  onResize,
   dragListeners,
   children,
 }: SelectableBlockProps) {
   const showControls = isSelected || isHovered;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div
+      ref={containerRef}
       data-block-id={blockId}
       onClick={(e) => {
         e.preventDefault();
@@ -80,6 +84,27 @@ export function SelectableBlock({
         </div>
       </div>
 
+      {/* Resize handles (selected only) */}
+      {isSelected && onResize && (
+        <>
+          <ResizeHandle
+            direction="right"
+            containerRef={containerRef}
+            onResizeEnd={(w, h) => onResize(blockId, w, h)}
+          />
+          <ResizeHandle
+            direction="bottom"
+            containerRef={containerRef}
+            onResizeEnd={(w, h) => onResize(blockId, w, h)}
+          />
+          <ResizeHandle
+            direction="corner"
+            containerRef={containerRef}
+            onResizeEnd={(w, h) => onResize(blockId, w, h)}
+          />
+        </>
+      )}
+
       {/* "+" add block button at bottom */}
       {showControls && onAddAfter && (
         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-50">
@@ -114,5 +139,126 @@ export function SelectableBlock({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Resize Handle ───────────────────────────────────────────────────────────
+
+function ResizeHandle({
+  direction,
+  containerRef,
+  onResizeEnd,
+}: {
+  direction: 'right' | 'bottom' | 'corner';
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onResizeEnd: (width: string | undefined, height: string | undefined) => void;
+}) {
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startWidth = container.offsetWidth;
+      const startHeight = container.offsetHeight;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const dx = moveEvent.clientX - startX;
+        const dy = moveEvent.clientY - startY;
+
+        if (direction === 'right' || direction === 'corner') {
+          container.style.width = `${startWidth + dx}px`;
+        }
+        if (direction === 'bottom' || direction === 'corner') {
+          container.style.height = `${startHeight + dy}px`;
+        }
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+
+        const w = direction === 'right' || direction === 'corner'
+          ? `${container.offsetWidth}px`
+          : undefined;
+        const h = direction === 'bottom' || direction === 'corner'
+          ? `${container.offsetHeight}px`
+          : undefined;
+
+        onResizeEnd(w, h);
+      };
+
+      document.body.style.cursor =
+        direction === 'corner' ? 'nwse-resize' :
+        direction === 'right' ? 'ew-resize' : 'ns-resize';
+      document.body.style.userSelect = 'none';
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [direction, containerRef, onResizeEnd],
+  );
+
+  const styles: React.CSSProperties = {
+    position: 'absolute',
+    zIndex: 51,
+    backgroundColor: '#3b82f6',
+    border: '1.5px solid white',
+    borderRadius: direction === 'corner' ? '2px' : '1px',
+  };
+
+  if (direction === 'right') {
+    return (
+      <div
+        onMouseDown={handleMouseDown}
+        style={{
+          ...styles,
+          right: '-5px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: '6px',
+          height: '24px',
+          cursor: 'ew-resize',
+        }}
+      />
+    );
+  }
+
+  if (direction === 'bottom') {
+    return (
+      <div
+        onMouseDown={handleMouseDown}
+        style={{
+          ...styles,
+          bottom: '-5px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '24px',
+          height: '6px',
+          cursor: 'ns-resize',
+        }}
+      />
+    );
+  }
+
+  // corner
+  return (
+    <div
+      onMouseDown={handleMouseDown}
+      style={{
+        ...styles,
+        right: '-5px',
+        bottom: '-5px',
+        width: '8px',
+        height: '8px',
+        cursor: 'nwse-resize',
+      }}
+    />
   );
 }

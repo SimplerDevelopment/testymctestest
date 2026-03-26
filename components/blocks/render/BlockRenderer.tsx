@@ -185,6 +185,7 @@ function DraggableBlockList({
                 onClicked={editor.onBlockClicked}
                 onHovered={editor.onBlockHovered}
                 onAddAfter={editor.onAddBlockAfter}
+                onResize={editor.onBlockResized}
                 registry={registry}
                 draggingId={draggingId}
                 editor={editor}
@@ -254,6 +255,7 @@ function SortableBlock({
   onClicked,
   onHovered,
   onAddAfter,
+  onResize,
   registry,
   draggingId,
   editor,
@@ -264,6 +266,7 @@ function SortableBlock({
   onClicked: (id: string) => void;
   onHovered: (id: string | null) => void;
   onAddAfter?: (id: string) => void;
+  onResize?: (id: string, width: string | undefined, height: string | undefined) => void;
   registry: ReturnType<typeof getBlockRegistry>;
   draggingId: string | null;
   editor: ReturnType<typeof useEditorModeContext>;
@@ -293,6 +296,7 @@ function SortableBlock({
         onClicked={onClicked}
         onHovered={onHovered}
         onAddAfter={onAddAfter}
+        onResize={onResize}
         dragListeners={listeners}
       >
         {isContainer ? (
@@ -343,6 +347,7 @@ function NestedSortableBlock({
         onClicked={editor.onBlockClicked}
         onHovered={editor.onBlockHovered}
         onAddAfter={editor.onAddBlockAfter}
+        onResize={editor.onBlockResized}
         dragListeners={listeners}
       >
         <BlockStyleWrapper block={block}>

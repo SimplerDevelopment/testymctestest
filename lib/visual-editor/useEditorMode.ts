@@ -118,5 +118,13 @@ export function useEditorMode() {
     [state.active],
   );
 
-  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter };
+  const onBlockResized = useCallback(
+    (blockId: string, width: string | undefined, height: string | undefined) => {
+      if (!state.active) return;
+      sendToParent(IFRAME_MESSAGES.BLOCK_RESIZED, { blockId, width, height });
+    },
+    [state.active],
+  );
+
+  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter, onBlockResized };
 }
