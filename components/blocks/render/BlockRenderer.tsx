@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Block, BlockEditorData } from '@/types/blocks';
 import { BlockStyleWrapper } from './BlockStyleWrapper';
 import { SelectableBlock } from '@/components/visual-editor/SelectableBlock';
@@ -117,6 +117,86 @@ function DraggableBlockList({
   registry: ReturnType<typeof getBlockRegistry>;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+
+  // Keyboard shortcuts for block editing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const selectedId = editor.selectedBlockId;
+      const idx = selectedId ? blocks.findIndex(b => b.id === selectedId) : -1;
+
+      // Escape: deselect
+      if (e.key === 'Escape' && selectedId) {
+        editor.onBlockClicked('');
+        return;
+      }
+
+      // Arrow up/down: navigate blocks (only when not in an input)
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'ArrowUp' && !mod && idx > 0) {
+        editor.onBlockClicked(blocks[idx - 1].id);
+        return;
+      }
+      if (e.key === 'ArrowDown' && !mod && idx >= 0 && idx < blocks.length - 1) {
+        editor.onBlockClicked(blocks[idx + 1].id);
+        return;
+      }
+
+      if (!mod) return;
+
+      // Cmd+Shift+Up/Down: move block
+      if (e.shiftKey && e.key === 'ArrowUp' && idx > 0) {
+        e.preventDefault();
+        const updated = [...blocks];
+        [updated[idx], updated[idx - 1]] = [updated[idx - 1], updated[idx]];
+        editor.onBlocksReordered(updated);
+        return;
+      }
+      if (e.shiftKey && e.key === 'ArrowDown' && idx >= 0 && idx < blocks.length - 1) {
+        e.preventDefault();
+        const updated = [...blocks];
+        [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+        editor.onBlocksReordered(updated);
+        return;
+      }
+
+      // Cmd+D: duplicate
+      if (e.key === 'd' && selectedId) {
+        e.preventDefault();
+        const block = findBlock(blocks, selectedId);
+        if (block) {
+          const dup = { ...block, id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
+          const updated = [...blocks];
+          updated.splice(idx + 1, 0, dup);
+          editor.onBlocksReordered(updated);
+        }
+        return;
+      }
+
+      // Cmd+Backspace: delete
+      if (e.key === 'Backspace' && selectedId) {
+        e.preventDefault();
+        const nextId = idx < blocks.length - 1 ? blocks[idx + 1]?.id : blocks[idx - 1]?.id;
+        const updated = removeBlock(blocks, selectedId);
+        editor.onBlocksReordered(updated);
+        if (nextId) editor.onBlockClicked(nextId);
+        return;
+      }
+
+      // Cmd+Enter: add block after
+      if (e.key === 'Enter' && selectedId) {
+        e.preventDefault();
+        editor.onAddBlockAfter(selectedId);
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [blocks, editor]);
+
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
