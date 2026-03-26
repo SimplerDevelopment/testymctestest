@@ -84,8 +84,13 @@ export function BlockStyleWrapper({ block, children }: BlockStyleWrapperProps) {
   if (style.textDecoration) customStyles.textDecoration = style.textDecoration;
   if (style.textTransform) customStyles.textTransform = style.textTransform;
 
-  // Background image
-  if (style.backgroundImage) customStyles.backgroundImage = `url(${style.backgroundImage})`;
+  // Background image — resolve relative URLs against the CMS host
+  if (style.backgroundImage) {
+    const imgUrl = style.backgroundImage.startsWith('/')
+      ? `${process.env.NEXT_PUBLIC_CMS_URL || process.env.CMS_API_URL || ''}${style.backgroundImage}`
+      : style.backgroundImage;
+    customStyles.backgroundImage = `url(${imgUrl})`;
+  }
   if (style.backgroundSize) customStyles.backgroundSize = style.backgroundSize;
   if (style.backgroundPosition) customStyles.backgroundPosition = style.backgroundPosition;
   if (style.backgroundRepeat) customStyles.backgroundRepeat = style.backgroundRepeat;
