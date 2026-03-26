@@ -110,5 +110,13 @@ export function useEditorMode() {
     [state.active],
   );
 
-  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered };
+  const onAddBlockAfter = useCallback(
+    (blockId: string) => {
+      if (!state.active) return;
+      sendToParent(IFRAME_MESSAGES.ADD_BLOCK_AFTER, { blockId });
+    },
+    [state.active],
+  );
+
+  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter };
 }

@@ -82,7 +82,7 @@ function DraggableBlockList({
   registry: ReturnType<typeof getBlockRegistry>;
 }) {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 15 } }),
   );
 
   const handleDragEnd = useCallback(
@@ -100,7 +100,7 @@ function DraggableBlockList({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-        <div className="block-content space-y-6">
+        <div className="block-content space-y-8">
           {blocks.map((block) => (
             <SortableBlock
               key={block.id}
@@ -109,6 +109,7 @@ function DraggableBlockList({
               isHovered={editor.hoveredBlockId === block.id}
               onClicked={editor.onBlockClicked}
               onHovered={editor.onBlockHovered}
+              onAddAfter={editor.onAddBlockAfter}
               registry={registry}
             />
           ))}
@@ -124,6 +125,7 @@ function SortableBlock({
   isHovered,
   onClicked,
   onHovered,
+  onAddAfter,
   registry,
 }: {
   block: Block;
@@ -131,12 +133,13 @@ function SortableBlock({
   isHovered: boolean;
   onClicked: (id: string) => void;
   onHovered: (id: string | null) => void;
+  onAddAfter?: (id: string) => void;
   registry: ReturnType<typeof getBlockRegistry>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition || 'transform 200ms ease',
     opacity: isDragging ? 0.4 : 1,
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
@@ -149,10 +152,12 @@ function SortableBlock({
     <div ref={setNodeRef} style={style} {...attributes}>
       <SelectableBlock
         blockId={block.id}
+        blockType={block.type}
         isSelected={isSelected}
         isHovered={isHovered || isDragging}
         onClicked={onClicked}
         onHovered={onHovered}
+        onAddAfter={onAddAfter}
         dragListeners={listeners}
       >
         <BlockStyleWrapper block={block}>
