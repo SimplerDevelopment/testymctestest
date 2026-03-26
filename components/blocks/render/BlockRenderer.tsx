@@ -307,6 +307,52 @@ function SortableBlock({
   );
 }
 
+// ─── Nested draggable block (inside containers) ─────────────────────────────
+
+function NestedSortableBlock({
+  block,
+  registry,
+  editor,
+  draggingId,
+}: {
+  block: Block;
+  registry: ReturnType<typeof getBlockRegistry>;
+  editor: ReturnType<typeof useEditorModeContext>;
+  draggingId: string | null;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition || 'transform 200ms ease',
+    opacity: isDragging ? 0.3 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const Component = registry.get(block.type);
+  if (!Component) return null;
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {draggingId && <DropIndicator id={`between:${block.id}:before`} dragging={true} />}
+      <SelectableBlock
+        blockId={block.id}
+        blockType={block.type}
+        isSelected={editor.selectedBlockId === block.id}
+        isHovered={editor.hoveredBlockId === block.id || isDragging}
+        onClicked={editor.onBlockClicked}
+        onHovered={editor.onBlockHovered}
+        onAddAfter={editor.onAddBlockAfter}
+        dragListeners={listeners}
+      >
+        <BlockStyleWrapper block={block}>
+          <Component block={block} />
+        </BlockStyleWrapper>
+      </SelectableBlock>
+    </div>
+  );
+}
+
 // ─── Container block renderer (columns with nested drop zones) ───────────────
 
 function ContainerBlockRenderer({
@@ -326,30 +372,14 @@ function ContainerBlockRenderer({
       <div className={`flex ${gapClass} py-4`}>
         {block.columns.map((col, i) => (
           <div key={col.id} style={{ width: `${col.width}%` }} className="min-h-[60px]">
-            {col.blocks.map((nested, ni) => {
-              const Component = registry.get(nested.type);
-              if (!Component) return null;
-              return (
-                <div key={nested.id}>
-                  {draggingId && <DropIndicator id={`between:${nested.id}:before`} dragging={true} />}
-                  <SelectableBlock
-                    blockId={nested.id}
-                    blockType={nested.type}
-                    isSelected={editor.selectedBlockId === nested.id}
-                    isHovered={editor.hoveredBlockId === nested.id}
-                    onClicked={editor.onBlockClicked}
-                    onHovered={editor.onBlockHovered}
-                  >
-                    <BlockStyleWrapper block={nested}>
-                      <Component block={nested} />
-                    </BlockStyleWrapper>
-                  </SelectableBlock>
-                  {ni === col.blocks.length - 1 && draggingId && (
-                    <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
-                  )}
-                </div>
-              );
-            })}
+            {col.blocks.map((nested, ni) => (
+              <div key={nested.id}>
+                <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
+                {ni === col.blocks.length - 1 && draggingId && (
+                  <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
+                )}
+              </div>
+            ))}
             <ContainerSlotDropZone containerId={block.id} slotIndex={i} hasChildren={col.blocks.length > 0} />
           </div>
         ))}
@@ -360,30 +390,14 @@ function ContainerBlockRenderer({
   if (block.type === 'section') {
     return (
       <div className="py-4 px-2 border border-dashed border-gray-200 rounded min-h-[60px]">
-        {block.blocks.map((nested, ni) => {
-          const Component = registry.get(nested.type);
-          if (!Component) return null;
-          return (
-            <div key={nested.id}>
-              {draggingId && <DropIndicator id={`between:${nested.id}:before`} dragging={true} />}
-              <SelectableBlock
-                blockId={nested.id}
-                blockType={nested.type}
-                isSelected={editor.selectedBlockId === nested.id}
-                isHovered={editor.hoveredBlockId === nested.id}
-                onClicked={editor.onBlockClicked}
-                onHovered={editor.onBlockHovered}
-              >
-                <BlockStyleWrapper block={nested}>
-                  <Component block={nested} />
-                </BlockStyleWrapper>
-              </SelectableBlock>
-              {ni === block.blocks.length - 1 && draggingId && (
-                <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
-              )}
-            </div>
-          );
-        })}
+        {block.blocks.map((nested, ni) => (
+          <div key={nested.id}>
+            <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
+            {ni === block.blocks.length - 1 && draggingId && (
+              <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
+            )}
+          </div>
+        ))}
         <ContainerSlotDropZone containerId={block.id} slotIndex={0} hasChildren={block.blocks.length > 0} />
       </div>
     );
