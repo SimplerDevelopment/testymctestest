@@ -126,5 +126,18 @@ export function useEditorMode() {
     [state.active],
   );
 
-  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter, onBlockResized };
+  const onBlockStyleUpdated = useCallback(
+    (blockId: string, style: Record<string, string>) => {
+      if (!state.active) return;
+      // Update local blocks state with new style
+      setState((s) => ({
+        ...s,
+        blocks: s.blocks.map(b => b.id === blockId ? { ...b, style: { ...(b.style || {}), ...style } } : b),
+      }));
+      sendToParent(IFRAME_MESSAGES.BLOCK_STYLE_UPDATED, { blockId, style });
+    },
+    [state.active],
+  );
+
+  return { ...state, onBlockClicked, onBlockHovered, onBlocksReordered, onAddBlockAfter, onBlockResized, onBlockStyleUpdated };
 }

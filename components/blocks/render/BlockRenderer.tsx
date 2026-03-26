@@ -379,6 +379,8 @@ function SortableBlock({
         onHovered={onHovered}
         onAddAfter={onAddAfter}
         onResize={onResize}
+        onStyleUpdate={editor.onBlockStyleUpdated}
+        currentStyle={block.style ? { padding: block.style.padding, margin: block.style.margin } : undefined}
         dragListeners={listeners}
       >
         {isContainer ? (
