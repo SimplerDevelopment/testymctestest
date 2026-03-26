@@ -15,6 +15,7 @@ interface EditorModeContextValue {
   onBlocksReordered: (blocks: Block[]) => void;
   onAddBlockAfter: (blockId: string) => void;
   onBlockResized: (blockId: string, width: string | undefined, height: string | undefined) => void;
+  onBlockStyleUpdated: (blockId: string, style: Record<string, string>) => void;
 }
 
 const EditorModeContext = createContext<EditorModeContextValue>({
@@ -27,6 +28,7 @@ const EditorModeContext = createContext<EditorModeContextValue>({
   onBlocksReordered: () => {},
   onAddBlockAfter: () => {},
   onBlockResized: () => {},
+  onBlockStyleUpdated: () => {},
 });
 
 export function useEditorModeContext() {
