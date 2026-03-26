@@ -9,7 +9,8 @@ import { getBlockRegistry } from '@/lib/visual-editor/registry';
 import {
   DndContext,
   pointerWithin,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -18,10 +19,11 @@ import {
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-// Using manual translate3d instead of CSS.Transform to avoid unwanted scaling
+
+// No-op sorting strategy: items stay in place during drag, only reorder on drop
+const noMovementStrategy = () => null;
 
 interface BlockRendererProps {
   content: string;
@@ -116,7 +118,8 @@ function DraggableBlockList({
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 15 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -172,7 +175,7 @@ function DraggableBlockList({
 
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+      <SortableContext items={ids} strategy={noMovementStrategy}>
         <div className="block-content">
           {blocks.map((block, i) => (
             <div key={block.id}>
@@ -213,10 +216,10 @@ function DropIndicator({ id, dragging }: { id: string; dragging: boolean }) {
     <div
       ref={setNodeRef}
       className="relative"
-      style={{ height: isOver ? '8px' : '8px', transition: 'all 150ms ease' }}
+      style={{ height: '8px' }}
     >
       {isOver && (
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] bg-blue-500 rounded-full">
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] bg-blue-500 rounded-full z-20">
           <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-blue-500 rounded-full" />
           <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-blue-500 rounded-full" />
         </div>
@@ -271,11 +274,10 @@ function SortableBlock({
   draggingId: string | null;
   editor: ReturnType<typeof useEditorModeContext>;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: block.id, transition: null });
   const style = {
-    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
-    transition: transition || 'transform 200ms ease',
     opacity: isDragging ? 0.3 : 1,
+    transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
   };
@@ -324,11 +326,10 @@ function NestedSortableBlock({
   editor: ReturnType<typeof useEditorModeContext>;
   draggingId: string | null;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: block.id, transition: null });
   const style = {
-    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
-    transition: transition || 'transform 200ms ease',
     opacity: isDragging ? 0.3 : 1,
+    transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
   };
