@@ -21,7 +21,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// Using manual translate3d instead of CSS.Transform to avoid unwanted scaling
 
 interface BlockRendererProps {
   content: string;
@@ -270,7 +270,7 @@ function SortableBlock({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
     transition: transition || 'transform 200ms ease',
     opacity: isDragging ? 0.3 : 1,
     position: 'relative' as const,
@@ -322,7 +322,7 @@ function NestedSortableBlock({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)` : undefined,
     transition: transition || 'transform 200ms ease',
     opacity: isDragging ? 0.3 : 1,
     position: 'relative' as const,
