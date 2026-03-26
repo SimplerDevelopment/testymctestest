@@ -488,37 +488,41 @@ function ContainerBlockRenderer({
   if (block.type === 'columns') {
     const gapClass = { sm: 'gap-4', md: 'gap-6', lg: 'gap-8' }[block.gap || 'md'];
     return (
-      <div className={`flex ${gapClass} py-4`}>
-        {block.columns.map((col, i) => (
-          <div key={col.id} style={{ width: `${col.width}%` }} className="min-h-[60px]">
-            {col.blocks.map((nested, ni) => (
-              <div key={nested.id}>
-                <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
-                {ni === col.blocks.length - 1 && draggingId && (
-                  <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
-                )}
-              </div>
-            ))}
-            <ContainerSlotDropZone containerId={block.id} slotIndex={i} hasChildren={col.blocks.length > 0} />
-          </div>
-        ))}
-      </div>
+      <BlockStyleWrapper block={block}>
+        <div className={`flex ${gapClass} py-4`}>
+          {block.columns.map((col, i) => (
+            <div key={col.id} style={{ width: `${col.width}%` }} className="min-h-[60px]">
+              {col.blocks.map((nested, ni) => (
+                <div key={nested.id}>
+                  <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
+                  {ni === col.blocks.length - 1 && draggingId && (
+                    <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
+                  )}
+                </div>
+              ))}
+              <ContainerSlotDropZone containerId={block.id} slotIndex={i} hasChildren={col.blocks.length > 0} />
+            </div>
+          ))}
+        </div>
+      </BlockStyleWrapper>
     );
   }
 
   if (block.type === 'section') {
     return (
-      <div className="py-4 px-2 border border-dashed border-gray-200 rounded min-h-[60px]">
-        {block.blocks.map((nested, ni) => (
-          <div key={nested.id}>
-            <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
-            {ni === block.blocks.length - 1 && draggingId && (
-              <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
-            )}
-          </div>
-        ))}
-        <ContainerSlotDropZone containerId={block.id} slotIndex={0} hasChildren={block.blocks.length > 0} />
-      </div>
+      <BlockStyleWrapper block={block}>
+        <div className="py-4 px-2 border border-dashed border-gray-200 rounded min-h-[60px]">
+          {block.blocks.map((nested, ni) => (
+            <div key={nested.id}>
+              <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
+              {ni === block.blocks.length - 1 && draggingId && (
+                <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
+              )}
+            </div>
+          ))}
+          <ContainerSlotDropZone containerId={block.id} slotIndex={0} hasChildren={block.blocks.length > 0} />
+        </div>
+      </BlockStyleWrapper>
     );
   }
 
