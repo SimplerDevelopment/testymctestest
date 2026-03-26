@@ -266,80 +266,6 @@ function DraggableBlockList({
   const ids = allBlockIds(blocks);
 
   return (
-    <>
-    {/* Floating undo/redo toolbar */}
-    <div
-      style={{
-        position: 'sticky',
-        top: '8px',
-        zIndex: 100,
-        display: 'flex',
-        justifyContent: 'center',
-        pointerEvents: 'none',
-        marginBottom: '-40px',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '2px',
-          background: 'white',
-          border: '1px solid #e2e8f0',
-          borderRadius: '8px',
-          padding: '4px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          pointerEvents: 'auto',
-        }}
-      >
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); editor.undo(); }}
-          disabled={!editor.canUndo}
-          title="Undo (Cmd+Z)"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '28px',
-            height: '28px',
-            border: 'none',
-            borderRadius: '4px',
-            background: 'transparent',
-            color: editor.canUndo ? '#374151' : '#d1d5db',
-            cursor: editor.canUndo ? 'pointer' : 'default',
-            fontSize: '16px',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); editor.redo(); }}
-          disabled={!editor.canRedo}
-          title="Redo (Cmd+Shift+Z)"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '28px',
-            height: '28px',
-            border: 'none',
-            borderRadius: '4px',
-            background: 'transparent',
-            color: editor.canRedo ? '#374151' : '#d1d5db',
-            cursor: editor.canRedo ? 'pointer' : 'default',
-            fontSize: '16px',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
-          </svg>
-        </button>
-      </div>
-    </div>
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <SortableContext items={ids} strategy={noMovementStrategy}>
         <div className="block-content">
@@ -368,7 +294,6 @@ function DraggableBlockList({
         </div>
       </SortableContext>
     </DndContext>
-    </>
   );
 }
 

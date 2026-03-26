@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isValidOrigin, isVisualEditorMessage, sendToParent, PARENT_MESSAGES, IFRAME_MESSAGES } from './protocol';
 import type { Block, PageSettings } from '@/types/blocks';
 import { getBlockRegistry } from './registry';
@@ -56,6 +56,24 @@ export function useEditorMode() {
     sendToParent(IFRAME_MESSAGES.BLOCKS_REORDERED, { blocks: next });
   }, [state.blocks]);
 
+  // Store undo/redo in refs so the message handler can call them
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
+
+  // Broadcast undo/redo availability to parent
+  const prevCanUndo = useRef(false);
+  const prevCanRedo = useRef(false);
+  useEffect(() => {
+    if (!state.active) return;
+    if (prevCanUndo.current !== canUndo || prevCanRedo.current !== canRedo) {
+      prevCanUndo.current = canUndo;
+      prevCanRedo.current = canRedo;
+      sendToParent(IFRAME_MESSAGES.UNDO_REDO_STATE, { canUndo, canRedo });
+    }
+  }, [state.active, canUndo, canRedo]);
+
   // Detect edit mode and set up listeners
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -108,6 +126,14 @@ export function useEditorMode() {
         case PARENT_MESSAGES.PAGE_SETTINGS_UPDATE: {
           const { pageSettings } = event.data.payload as { pageSettings: PageSettings };
           setState((s) => ({ ...s, pageSettings }));
+          break;
+        }
+        case PARENT_MESSAGES.UNDO: {
+          undoRef.current();
+          break;
+        }
+        case PARENT_MESSAGES.REDO: {
+          redoRef.current();
           break;
         }
       }
