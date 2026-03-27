@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Block, BlockEditorData } from '@/types/blocks';
 import { BlockStyleWrapper } from './BlockStyleWrapper';
 import { SelectableBlock } from '@/components/visual-editor/SelectableBlock';
 import { useEditorModeContext } from '@/components/visual-editor/EditorModeProvider';
 import { getBlockRegistry } from '@/lib/visual-editor/registry';
+import { sendToParent, IFRAME_MESSAGES } from '@/lib/visual-editor/protocol';
 import {
   DndContext,
   pointerWithin,
@@ -94,6 +95,24 @@ function findBlock(blocks: Block[], blockId: string): Block | null {
   return null;
 }
 
+function newBlockId() {
+  return `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function deepCloneBlock(block: Block): Block {
+  const clone = { ...block, id: newBlockId() };
+  if (clone.type === 'columns') {
+    clone.columns = clone.columns.map(c => ({ ...c, id: newBlockId(), blocks: c.blocks.map(deepCloneBlock) }));
+  }
+  if (clone.type === 'tabs') {
+    clone.tabs = clone.tabs.map(t => ({ ...t, id: newBlockId(), blocks: t.blocks.map(deepCloneBlock) }));
+  }
+  if (clone.type === 'section') {
+    clone.blocks = clone.blocks.map(deepCloneBlock);
+  }
+  return clone as Block;
+}
+
 function allBlockIds(blocks: Block[]): string[] {
   const ids: string[] = [];
   for (const b of blocks) {
@@ -117,16 +136,85 @@ function DraggableBlockList({
   registry: ReturnType<typeof getBlockRegistry>;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [externalDropIndex, setExternalDropIndex] = useState<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // External drag from parent block picker
+  useEffect(() => {
+    if (!editor.externalDrag.active) {
+      setExternalDropIndex(null);
+      return;
+    }
+
+    // Find nearest drop position based on cursor Y coordinate
+    const container = contentRef.current;
+    if (!container) return;
+    const blockEls = container.querySelectorAll<HTMLElement>('[data-block-id]');
+    if (blockEls.length === 0) {
+      setExternalDropIndex(0);
+      return;
+    }
+
+    const y = editor.externalDrag.y;
+    let bestIndex = blocks.length; // default: append at end
+    for (let i = 0; i < blockEls.length; i++) {
+      const rect = blockEls[i].getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (y < midY) {
+        bestIndex = i;
+        break;
+      }
+    }
+    setExternalDropIndex(bestIndex);
+  }, [editor.externalDrag.active, editor.externalDrag.y, blocks.length]);
+
+  // Handle external drop event
+  useEffect(() => {
+    const handleDrop = () => {
+      const blockType = editor.externalDrag.blockType;
+      if (!blockType || externalDropIndex === null) return;
+
+      // Create a default block of the dragged type
+      const newBlock: Block = {
+        id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: blockType as Block['type'],
+        order: externalDropIndex,
+        content: blockType === 'text' ? 'New text block' : '',
+        ...(blockType === 'heading' && { content: 'New Heading', level: 2 }),
+        ...(blockType === 'button' && { text: 'Click Me', url: '#' }),
+        ...(blockType === 'spacer' && { height: '40px' }),
+        ...(blockType === 'divider' && {}),
+        ...(blockType === 'quote' && { content: 'Quote text', author: '' }),
+        ...(blockType === 'code' && { code: '', language: 'javascript' }),
+        ...(blockType === 'image' && { src: '', alt: '' }),
+        ...(blockType === 'columns' && { columns: [
+          { id: `col-${Date.now()}-1`, width: 50, blocks: [] },
+          { id: `col-${Date.now()}-2`, width: 50, blocks: [] },
+        ], gap: 'md' }),
+        ...(blockType === 'section' && { blocks: [] }),
+      } as Block;
+
+      const updated = [...blocks];
+      updated.splice(externalDropIndex, 0, newBlock);
+      editor.onBlocksReordered(updated);
+      sendToParent(IFRAME_MESSAGES.EXTERNAL_DROP_COMPLETED, { blocks: updated });
+      setExternalDropIndex(null);
+    };
+
+    window.addEventListener('sd-external-drop', handleDrop);
+    return () => window.removeEventListener('sd-external-drop', handleDrop);
+  }, [blocks, editor, externalDropIndex]);
 
   // Keyboard shortcuts for block editing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       const selectedId = editor.selectedBlockId;
+      const selectedIds = editor.selectedBlockIds;
       const idx = selectedId ? blocks.findIndex(b => b.id === selectedId) : -1;
 
-      // Escape: deselect
-      if (e.key === 'Escape' && selectedId) {
+      // Escape: deselect all
+      if (e.key === 'Escape' && selectedIds.length > 0) {
         editor.onBlockClicked('');
         return;
       }
@@ -145,6 +233,18 @@ function DraggableBlockList({
       }
 
       if (!mod) return;
+
+      // Cmd+A: select all top-level blocks
+      if (e.key === 'a') {
+        e.preventDefault();
+        const allIds = blocks.map(b => b.id);
+        // Set all as selected by clicking each with meta
+        allIds.forEach((id, i) => {
+          if (i === 0) editor.onBlockClicked(id);
+          else editor.onBlockClicked(id, { metaKey: true });
+        });
+        return;
+      }
 
       // Cmd+Z: undo, Cmd+Shift+Z: redo
       if (e.key === 'z' && !e.shiftKey) {
@@ -174,26 +274,55 @@ function DraggableBlockList({
         return;
       }
 
-      // Cmd+D: duplicate
-      if (e.key === 'd' && selectedId) {
+      // Cmd+D: duplicate (supports multi-select)
+      if (e.key === 'd' && selectedIds.length > 0) {
         e.preventDefault();
-        const block = findBlock(blocks, selectedId);
-        if (block) {
-          const dup = { ...block, id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
-          const updated = [...blocks];
-          updated.splice(idx + 1, 0, dup);
-          editor.onBlocksReordered(updated);
+        let updated = [...blocks];
+        for (const id of selectedIds) {
+          const block = findBlock(updated, id);
+          if (block) {
+            const dup = deepCloneBlock(block);
+            updated = insertNearBlock(updated, id, 'after', dup);
+          }
         }
+        editor.onBlocksReordered(updated);
         return;
       }
 
-      // Cmd+Backspace: delete
-      if (e.key === 'Backspace' && selectedId) {
+      // Cmd+Backspace: delete (supports multi-select)
+      if (e.key === 'Backspace' && selectedIds.length > 0) {
         e.preventDefault();
-        const nextId = idx < blocks.length - 1 ? blocks[idx + 1]?.id : blocks[idx - 1]?.id;
-        const updated = removeBlock(blocks, selectedId);
+        let updated = [...blocks];
+        for (const id of selectedIds) {
+          updated = removeBlock(updated, id);
+        }
         editor.onBlocksReordered(updated);
-        if (nextId) editor.onBlockClicked(nextId);
+        editor.onBlockClicked('');
+        return;
+      }
+
+      // Cmd+G: group selected blocks into a section
+      if (e.key === 'g' && selectedIds.length > 1) {
+        e.preventDefault();
+        const selectedBlocks = selectedIds.map(id => findBlock(blocks, id)).filter(Boolean) as Block[];
+        if (selectedBlocks.length < 2) return;
+        // Remove selected blocks
+        let updated = [...blocks];
+        for (const id of selectedIds) {
+          updated = removeBlock(updated, id);
+        }
+        // Create section containing them
+        const section: Block = {
+          id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'section',
+          order: 0,
+          blocks: selectedBlocks,
+        } as Block;
+        // Insert at position of first selected block
+        const firstIdx = blocks.findIndex(b => selectedIds.includes(b.id));
+        updated.splice(Math.min(firstIdx, updated.length), 0, section);
+        editor.onBlocksReordered(updated);
+        editor.onBlockClicked(section.id);
         return;
       }
 
@@ -268,14 +397,18 @@ function DraggableBlockList({
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <SortableContext items={ids} strategy={noMovementStrategy}>
-        <div className="block-content">
+        <div className="block-content" ref={contentRef}>
           {blocks.map((block, i) => (
             <div key={block.id}>
+              {/* External drop indicator before this block */}
+              {editor.externalDrag.active && externalDropIndex === i && (
+                <ExternalDropIndicator />
+              )}
               {/* Drop zone before this block */}
               <DropIndicator id={`between:${block.id}:before`} dragging={draggingId !== null} />
               <SortableBlock
                 block={block}
-                isSelected={editor.selectedBlockId === block.id}
+                isSelected={editor.selectedBlockIds.includes(block.id)}
                 isHovered={editor.hoveredBlockId === block.id}
                 onClicked={editor.onBlockClicked}
                 onHovered={editor.onBlockHovered}
@@ -287,13 +420,35 @@ function DraggableBlockList({
               />
               {/* Drop zone after last block */}
               {i === blocks.length - 1 && (
-                <DropIndicator id={`between:${block.id}:after`} dragging={draggingId !== null} />
+                <>
+                  <DropIndicator id={`between:${block.id}:after`} dragging={draggingId !== null} />
+                  {editor.externalDrag.active && externalDropIndex === blocks.length && (
+                    <ExternalDropIndicator />
+                  )}
+                </>
               )}
             </div>
           ))}
+          {/* Empty state: show indicator when no blocks exist */}
+          {blocks.length === 0 && editor.externalDrag.active && (
+            <ExternalDropIndicator />
+          )}
         </div>
       </SortableContext>
     </DndContext>
+  );
+}
+
+// ─── External drop indicator (for drag from parent block picker) ──────────────
+
+function ExternalDropIndicator() {
+  return (
+    <div className="relative" style={{ height: '4px', margin: '4px 0' }}>
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] bg-green-500 rounded-full z-20">
+        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-green-500 rounded-full" />
+        <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-green-500 rounded-full" />
+      </div>
+    </div>
   );
 }
 
@@ -443,6 +598,7 @@ function NestedSortableBlock({
     transition: 'opacity 200ms',
     position: 'relative' as const,
     zIndex: isDragging ? 50 : undefined,
+    minWidth: 0,
   };
 
   const Component = registry.get(block.type);
@@ -454,7 +610,7 @@ function NestedSortableBlock({
       <SelectableBlock
         blockId={block.id}
         blockType={block.type}
-        isSelected={editor.selectedBlockId === block.id}
+        isSelected={editor.selectedBlockIds.includes(block.id)}
         isHovered={editor.hoveredBlockId === block.id || isDragging}
         onClicked={editor.onBlockClicked}
         onHovered={editor.onBlockHovered}
@@ -509,16 +665,25 @@ function ContainerBlockRenderer({
   }
 
   if (block.type === 'section') {
+    const s = block.style;
+    const sectionInnerStyle: React.CSSProperties = {
+      ...(s?.display ? { display: s.display } : {}),
+      ...(s?.flexDirection ? { flexDirection: s.flexDirection } : {}),
+      ...(s?.justifyContent ? { justifyContent: s.justifyContent } : {}),
+      ...(s?.alignItems ? { alignItems: s.alignItems } : {}),
+      ...(s?.flexWrap ? { flexWrap: s.flexWrap } : {}),
+      ...(s?.gap ? { gap: s.gap } : {}),
+    };
     return (
       <BlockStyleWrapper block={block}>
-        <div className="py-4 px-2 border border-dashed border-gray-200 rounded min-h-[60px]">
+        <div className="py-4 px-2 border border-dashed border-gray-200 rounded min-h-[60px]" style={sectionInnerStyle}>
           {block.blocks.map((nested, ni) => (
-            <div key={nested.id}>
+            <Fragment key={nested.id}>
               <NestedSortableBlock block={nested} registry={registry} editor={editor} draggingId={draggingId} />
               {ni === block.blocks.length - 1 && draggingId && (
                 <DropIndicator id={`between:${nested.id}:after`} dragging={true} />
               )}
-            </div>
+            </Fragment>
           ))}
           <ContainerSlotDropZone containerId={block.id} slotIndex={0} hasChildren={block.blocks.length > 0} />
         </div>

@@ -14,7 +14,7 @@ interface SelectableBlockProps {
   blockType?: string;
   isSelected: boolean;
   isHovered: boolean;
-  onClicked: (blockId: string) => void;
+  onClicked: (blockId: string, modifiers?: { shiftKey?: boolean; metaKey?: boolean; ctrlKey?: boolean }) => void;
   onHovered: (blockId: string | null) => void;
   onAddAfter?: (blockId: string) => void;
   onResize?: (blockId: string, width: string | undefined, height: string | undefined) => void;
@@ -51,7 +51,7 @@ export function SelectableBlock({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClicked(blockId);
+        onClicked(blockId, { shiftKey: e.shiftKey, metaKey: e.metaKey, ctrlKey: e.ctrlKey });
       }}
       onMouseEnter={() => onHovered(blockId)}
       onMouseLeave={() => onHovered(null)}

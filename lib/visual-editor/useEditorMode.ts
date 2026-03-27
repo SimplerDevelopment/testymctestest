@@ -5,12 +5,21 @@ import { isValidOrigin, isVisualEditorMessage, sendToParent, PARENT_MESSAGES, IF
 import type { Block, PageSettings } from '@/types/blocks';
 import { getBlockRegistry } from './registry';
 
+export interface ExternalDragState {
+  active: boolean;
+  blockType: string | null;
+  x: number;
+  y: number;
+}
+
 interface EditorState {
   active: boolean;
   blocks: Block[];
   selectedBlockId: string | null;
+  selectedBlockIds: string[];
   hoveredBlockId: string | null;
   pageSettings?: PageSettings;
+  externalDrag: ExternalDragState;
 }
 
 const MAX_HISTORY = 50;
@@ -20,7 +29,9 @@ export function useEditorMode() {
     active: false,
     blocks: [],
     selectedBlockId: null,
+    selectedBlockIds: [],
     hoveredBlockId: null,
+    externalDrag: { active: false, blockType: null, x: 0, y: 0 },
   });
 
   // Undo/redo history
@@ -156,6 +167,27 @@ export function useEditorMode() {
           redoRef.current();
           break;
         }
+        case PARENT_MESSAGES.EXTERNAL_DRAG_START: {
+          const { blockType } = event.data.payload as { blockType: string };
+          setState((s) => ({ ...s, externalDrag: { active: true, blockType, x: 0, y: 0 } }));
+          break;
+        }
+        case PARENT_MESSAGES.EXTERNAL_DRAG_MOVE: {
+          const { x, y } = event.data.payload as { x: number; y: number };
+          setState((s) => ({ ...s, externalDrag: { ...s.externalDrag, x, y } }));
+          break;
+        }
+        case PARENT_MESSAGES.EXTERNAL_DRAG_END: {
+          const { x, y } = event.data.payload as { x: number; y: number };
+          setState((s) => ({ ...s, externalDrag: { ...s.externalDrag, x, y, active: false } }));
+          // The BlockRenderer will handle the actual drop via onExternalDrop
+          window.dispatchEvent(new CustomEvent('sd-external-drop', { detail: { x, y } }));
+          break;
+        }
+        case PARENT_MESSAGES.EXTERNAL_DRAG_CANCEL: {
+          setState((s) => ({ ...s, externalDrag: { active: false, blockType: null, x: 0, y: 0 } }));
+          break;
+        }
       }
     }
 
@@ -170,10 +202,40 @@ export function useEditorMode() {
   }, []);
 
   const onBlockClicked = useCallback(
-    (blockId: string) => {
+    (blockId: string, modifiers?: { shiftKey?: boolean; metaKey?: boolean; ctrlKey?: boolean }) => {
       if (!state.active) return;
-      setState((s) => ({ ...s, selectedBlockId: blockId }));
-      sendToParent(IFRAME_MESSAGES.BLOCK_CLICKED, { blockId });
+      const multi = modifiers?.metaKey || modifiers?.ctrlKey;
+      const shift = modifiers?.shiftKey;
+
+      setState((s) => {
+        let newIds: string[];
+        if (multi) {
+          // Toggle: add or remove from selection
+          newIds = s.selectedBlockIds.includes(blockId)
+            ? s.selectedBlockIds.filter(id => id !== blockId)
+            : [...s.selectedBlockIds, blockId];
+        } else if (shift && s.selectedBlockIds.length > 0) {
+          // Range: select from last selected to clicked
+          const topBlocks = s.blocks.map(b => b.id);
+          const lastId = s.selectedBlockIds[s.selectedBlockIds.length - 1];
+          const fromIdx = topBlocks.indexOf(lastId);
+          const toIdx = topBlocks.indexOf(blockId);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            const start = Math.min(fromIdx, toIdx);
+            const end = Math.max(fromIdx, toIdx);
+            newIds = [...new Set([...s.selectedBlockIds, ...topBlocks.slice(start, end + 1)])];
+          } else {
+            newIds = [blockId];
+          }
+        } else {
+          // Single select
+          newIds = [blockId];
+        }
+        const primary = newIds.length > 0 ? newIds[newIds.length - 1] : null;
+        return { ...s, selectedBlockId: primary, selectedBlockIds: newIds };
+      });
+
+      sendToParent(IFRAME_MESSAGES.BLOCK_CLICKED, { blockId, modifiers });
     },
     [state.active],
   );
