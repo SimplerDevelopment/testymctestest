@@ -6,7 +6,10 @@ import type { Metadata } from 'next';
 
 export const revalidate = 60;
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -23,11 +26,14 @@ export async function generateStaticParams() {
   return posts.map((post) => ({ slug: post.slug }));
 }
 
-export default async function BlogPost({ params }: Props) {
+export default async function BlogPost({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const isEditMode = sp._edit === 'true';
+
   const post = await getPost(slug);
 
-  if (!post) notFound();
+  if (!isEditMode && !post) notFound();
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
@@ -39,7 +45,7 @@ export default async function BlogPost({ params }: Props) {
       </Link>
 
       <article className="mt-8">
-        {post.coverImage && (
+        {post?.coverImage && (
           <img
             src={post.coverImage}
             alt={post.title}
@@ -47,10 +53,10 @@ export default async function BlogPost({ params }: Props) {
           />
         )}
 
-        <h1 className="text-4xl font-bold tracking-tight">{post.title}</h1>
+        <h1 className="text-4xl font-bold tracking-tight">{post?.title || 'Untitled'}</h1>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-500">
-          {post.publishedAt && (
+          {post?.publishedAt && (
             <time>
               {new Date(post.publishedAt).toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -59,7 +65,7 @@ export default async function BlogPost({ params }: Props) {
               })}
             </time>
           )}
-          {post.categories.map((cat) => (
+          {post?.categories.map((cat) => (
             <span
               key={cat.id}
               className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium"
@@ -70,9 +76,9 @@ export default async function BlogPost({ params }: Props) {
           ))}
         </div>
 
-        {post.tags.length > 0 && (
+        {(post?.tags.length ?? 0) > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {post.tags.map((tag) => (
+            {post?.tags.map((tag) => (
               <span
                 key={tag.id}
                 className="text-xs text-gray-400"
@@ -84,7 +90,7 @@ export default async function BlogPost({ params }: Props) {
         )}
 
         <div className="prose prose-gray mt-8 max-w-none">
-          <BlockRenderer content={post.content} />
+          <BlockRenderer content={post?.content || '{"blocks":[],"version":"1.0"}'} />
         </div>
       </article>
     </main>

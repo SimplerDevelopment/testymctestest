@@ -5,7 +5,10 @@ import type { Metadata } from 'next';
 
 export const revalidate = 60;
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -22,13 +25,18 @@ export async function generateStaticParams() {
   return pages.map((page) => ({ slug: page.slug }));
 }
 
-export default async function Page({ params }: Props) {
+export default async function Page({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const isEditMode = sp._edit === 'true';
+
   const post = await getPost(slug);
 
-  if (!post || post.postType !== 'page') notFound();
+  // In edit mode, render even without a published post — the editor
+  // sends blocks via postMessage and BlockRenderer picks them up
+  if (!isEditMode && (!post || post.postType !== 'page')) notFound();
 
   return (
-    <BlockRenderer content={post.content} />
+    <BlockRenderer content={post?.content || '{"blocks":[],"version":"1.0"}'} />
   );
 }
