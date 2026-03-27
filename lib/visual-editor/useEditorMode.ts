@@ -27,6 +27,9 @@ export function useEditorMode() {
   const historyRef = useRef<Block[][]>([]);
   const futureRef = useRef<Block[][]>([]);
   const skipHistoryRef = useRef(false);
+  // Ref to current blocks so the stable message handler can access them
+  const blocksRef = useRef<Block[]>(state.blocks);
+  blocksRef.current = state.blocks;
 
   const pushHistory = useCallback((blocks: Block[]) => {
     historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), blocks];
@@ -104,7 +107,14 @@ export function useEditorMode() {
           // Don't overwrite local state during undo/redo
           if (skipHistoryRef.current) {
             skipHistoryRef.current = false;
+            setState((s) => ({ ...s, blocks }));
             return;
+          }
+          // Push current state to history so parent-initiated changes (add/delete/update) are undoable
+          const currentBlocks = blocksRef.current;
+          if (currentBlocks.length > 0 && JSON.stringify(currentBlocks) !== JSON.stringify(blocks)) {
+            historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), currentBlocks];
+            futureRef.current = [];
           }
           setState((s) => ({ ...s, blocks }));
           break;
