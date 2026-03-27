@@ -30,6 +30,9 @@ export function useEditorMode() {
   // Ref to current blocks so the stable message handler can access them
   const blocksRef = useRef<Block[]>(state.blocks);
   blocksRef.current = state.blocks;
+  // Track drag sessions so only one history entry is created per drag
+  const dragSessionRef = useRef<Block[] | null>(null);
+  const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pushHistory = useCallback((blocks: Block[]) => {
     historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), blocks];
@@ -110,11 +113,18 @@ export function useEditorMode() {
             setState((s) => ({ ...s, blocks }));
             return;
           }
-          // Push current state to history so parent-initiated changes (add/delete/update) are undoable
+          // Push current state to history so parent-initiated changes are undoable
+          // But only once per rapid sequence (drag batching)
           const currentBlocks = blocksRef.current;
           if (currentBlocks.length > 0 && JSON.stringify(currentBlocks) !== JSON.stringify(blocks)) {
-            historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), currentBlocks];
-            futureRef.current = [];
+            if (!dragSessionRef.current) {
+              dragSessionRef.current = currentBlocks;
+              historyRef.current = [...historyRef.current.slice(-MAX_HISTORY), currentBlocks];
+              futureRef.current = [];
+            }
+            // Reset drag session after quiet period
+            if (dragTimerRef.current) clearTimeout(dragTimerRef.current);
+            dragTimerRef.current = setTimeout(() => { dragSessionRef.current = null; }, 300);
           }
           setState((s) => ({ ...s, blocks }));
           break;
@@ -215,7 +225,14 @@ export function useEditorMode() {
           if (b.type === 'section') return { ...b, blocks: updateStyle(b.blocks) };
           return b;
         });
-      pushHistory(state.blocks);
+      // Only push history once at the start of a drag sequence
+      if (!dragSessionRef.current) {
+        dragSessionRef.current = state.blocks;
+        pushHistory(state.blocks);
+      }
+      // Reset drag session after a quiet period (drag ended)
+      if (dragTimerRef.current) clearTimeout(dragTimerRef.current);
+      dragTimerRef.current = setTimeout(() => { dragSessionRef.current = null; }, 300);
       setState((s) => ({ ...s, blocks: updateStyle(s.blocks) }));
       sendToParent(IFRAME_MESSAGES.BLOCK_STYLE_UPDATED, { blockId, style });
     },
